@@ -133,15 +133,31 @@ int32_t pci_get_interrupt_cause(void)
 int32_t pci_call_interrupt_chain(int32_t handle, int32_t data)
 {
     int i;
+    long retval;
 
     dbg("");
     for (i = 0; i < MAX_INTERRUPTS; i++)
     {
         if (interrupts[i].handle == handle)
         {
-            interrupts[i].handler(data);
-
-            return 1;
+            __asm__ volatile (
+                "lea 52(sp),sp \n\t"
+                "movem.l d1-d7/a1-a6,(sp) \n\t"
+                "move.l %1,d0 \n\t"             // Arguments in regs for external drivers (PCI-BIOS 1.2)
+                "move.l %2,a0 \n\t"             // Arguments in regs for external drivers (PCI-BIOS 1.2)
+                "move.l %2,-(sp) \n\t"          // Arguments in stack for internal drivers
+                "jsr (%3) \n\t"
+                "addq.l #4,sp  \n\t"
+                "move.l d0,%0 \n\t"
+                "movem.l (sp),d1-d7/a1-a6 \n\t"
+                "lea 52(sp),sp \n\t"
+                :"=r"(retval)
+                :"m"(data),"m"(interrupts[i].parameter),"a"(interrupts[i].handler)
+                :"d0","a0");
+            if (retval & 0x1L)
+                return 1;
+            else
+                break;
         }
     }
     return data;    /* unmodified - means: not handled */

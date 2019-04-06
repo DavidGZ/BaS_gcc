@@ -24,8 +24,18 @@
 #include <bas_types.h>
 #include "util.h"   /* for swpX() */
 
+/*
+ * For some unknonwn reason the FireBee triggers a "bus error"
+ * when accesing the 0x80000000 address.
+ */
+#if defined(MACHINE_FIREBEE)
+#define  PCI_MEMORY_OFFSET  0x90000000
+#define  PCI_MEMORY_SIZE    0x30000000
+#else
 #define  PCI_MEMORY_OFFSET  0x80000000
 #define  PCI_MEMORY_SIZE    0x40000000  /* 1 GByte PCI memory window */
+#endif
+
 #define  PCI_IO_OFFSET      0xD0000000
 #define  PCI_IO_SIZE        0x10000000  /* 256 MByte PCI I/O window */
 

@@ -616,6 +616,64 @@ int32_t pci_unhook_interrupt(int32_t handle)
     return PCI_DEVICE_NOT_FOUND;
 }
 
+int32_t pci_get_pagesize(void)
+{
+    return 0;
+}
+
+int32_t pci_virt_to_bus(int32_t handle, uint32_t address, PCI_CONV_ADR *pointer)
+{
+    int i = 0;
+
+    while (handles[i] != handle)
+    {
+        if (i > NUM_CARDS * NUM_RESOURCES)
+        {
+            return PCI_BAD_HANDLE;
+        }
+    i++;
+    }
+
+    pointer->adr = address;
+    pointer->len = PCI_MEMORY_SIZE;
+
+    return PCI_SUCCESSFUL;
+}
+int32_t pci_bus_to_virt(int32_t handle, uint32_t address, PCI_CONV_ADR *pointer)
+{
+    int i = 0;
+
+    while (handles[i] != handle)
+    {
+        if (i > NUM_CARDS * NUM_RESOURCES)
+        {
+            return PCI_BAD_HANDLE;
+        }
+    i++;
+    }
+
+    pointer->adr = address;
+    pointer->len = PCI_MEMORY_SIZE;
+
+    return PCI_SUCCESSFUL;
+}
+
+int32_t pci_virt_to_phys(uint32_t address, PCI_CONV_ADR *pointer)
+{
+    pointer->adr = address;
+    pointer->len = PCI_MEMORY_SIZE;
+
+    return PCI_SUCCESSFUL;
+}
+
+int32_t pci_phys_to_virt(uint32_t address, PCI_CONV_ADR *pointer)
+{
+    pointer->adr = address;
+    pointer->len = PCI_MEMORY_SIZE;
+
+    return PCI_SUCCESSFUL;
+}
+
 /*
  * Not implemented PCI_BIOS functions
  */
@@ -751,30 +809,6 @@ int32_t pci_write_io_longword(int32_t handle, uint32_t offset, uint32_t val)
 }
 
 int32_t pci_get_machine_id(void)
-{
-    return PCI_FUNC_NOT_SUPPORTED;
-}
-
-int32_t pci_get_pagesize(void)
-{
-    return PCI_FUNC_NOT_SUPPORTED;
-}
-
-int32_t pci_virt_to_bus(int32_t handle, uint32_t address, PCI_CONV_ADR *pointer)
-{
-    return PCI_FUNC_NOT_SUPPORTED;
-}
-int32_t pci_bus_to_virt(int32_t handle, uint32_t address, PCI_CONV_ADR *pointer)
-{
-    return PCI_FUNC_NOT_SUPPORTED;
-}
-
-int32_t pci_virt_to_phys(uint32_t address, PCI_CONV_ADR *pointer)
-{
-    return PCI_FUNC_NOT_SUPPORTED;
-}
-
-int32_t pci_phys_to_virt(uint32_t address, PCI_CONV_ADR *pointer)
 {
     return PCI_FUNC_NOT_SUPPORTED;
 }

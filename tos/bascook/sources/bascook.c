@@ -86,6 +86,7 @@ void setcookie(uint32_t cookie, uint32_t value)
 }
 
 #define COOKIE_DMAC 0x444d4143L /* FireTOS DMA API cookie ("DMAC") */
+#define COOKIE__PCI 0x5f504349L /* PCI-BIOS cookie ("_PCI") */
 #define COOKIE_BAS_ 0x4241535fL /* BAS_ cookie (points to driver table struct */
 
 static char *dt_to_str(enum driver_type dt)
@@ -140,6 +141,11 @@ static void set_driver_cookies(void)
                 {
                     setcookie(COOKIE_DMAC, (uint32_t) ifc->interface.dma);
                     printf("\r\nDMAC cookie set to %p\r\n", ifc->interface.dma);
+                }
+                if (ifc->type == PCI_DRIVER)
+                {
+                    setcookie(COOKIE__PCI, (uint32_t) ifc->interface.pci);
+                    printf("\r\n_PCI cookie set to %p\r\n", ifc->interface.pci);
                 }
                 ifc++;
             }

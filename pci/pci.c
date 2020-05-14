@@ -70,10 +70,11 @@ static struct pci_class
 };
 static int num_pci_classes = sizeof(pci_classes) / sizeof(struct pci_class);
 
-#define NUM_CARDS       10
-#define NUM_RESOURCES   7
+#define NUM_CARDS       (7+1) /* 7 slots + host bridge */
+#define NUM_RESOURCES   4     /* 4 functions per PCI slot */
+
 /* holds the handle of a card at position = array index */
-static int32_t handles[NUM_CARDS] = { -1 };
+static int32_t handles[NUM_CARDS * NUM_RESOURCES] = { -1 };
 
 /* holds the card's resource descriptors; filled in pci_device_config() */
 static struct pci_rd resource_descriptors[NUM_CARDS][NUM_RESOURCES];
@@ -133,31 +134,15 @@ int32_t pci_get_interrupt_cause(void)
 int32_t pci_call_interrupt_chain(int32_t handle, int32_t data)
 {
     int i;
-    long retval;
 
     dbg("");
     for (i = 0; i < MAX_INTERRUPTS; i++)
     {
         if (interrupts[i].handle == handle)
         {
-            __asm__ volatile (
-                "lea 52(sp),sp \n\t"
-                "movem.l d1-d7/a1-a6,(sp) \n\t"
-                "move.l %1,d0 \n\t"             // Arguments in regs for external drivers (PCI-BIOS 1.2)
-                "move.l %2,a0 \n\t"             // Arguments in regs for external drivers (PCI-BIOS 1.2)
-                "move.l %2,-(sp) \n\t"          // Arguments in stack for internal drivers
-                "jsr (%3) \n\t"
-                "addq.l #4,sp  \n\t"
-                "move.l d0,%0 \n\t"
-                "movem.l (sp),d1-d7/a1-a6 \n\t"
-                "lea 52(sp),sp \n\t"
-                :"=r"(retval)
-                :"m"(data),"m"(interrupts[i].parameter),"a"(interrupts[i].handler)
-                :"d0","a0");
-            if (retval & 0x1L)
-                return 1;
-            else
-                break;
+            interrupts[i].handler(data);
+
+            return 1;
         }
     }
     return data;    /* unmodified - means: not handled */
@@ -173,7 +158,7 @@ int pci_handle2index(int32_t handle)
 {
     int i;
 
-    for (i = 0; i < NUM_CARDS; i++)
+    for (i = 0; i < NUM_CARDS * NUM_RESOURCES; i++)
     {
         if (handles[i] == handle)
         {
@@ -616,64 +601,6 @@ int32_t pci_unhook_interrupt(int32_t handle)
     return PCI_DEVICE_NOT_FOUND;
 }
 
-int32_t pci_get_pagesize(void)
-{
-    return 0;
-}
-
-int32_t pci_virt_to_bus(int32_t handle, uint32_t address, PCI_CONV_ADR *pointer)
-{
-    int i = 0;
-
-    while (handles[i] != handle)
-    {
-        if (i > NUM_CARDS * NUM_RESOURCES)
-        {
-            return PCI_BAD_HANDLE;
-        }
-    i++;
-    }
-
-    pointer->adr = address;
-    pointer->len = PCI_MEMORY_SIZE;
-
-    return PCI_SUCCESSFUL;
-}
-int32_t pci_bus_to_virt(int32_t handle, uint32_t address, PCI_CONV_ADR *pointer)
-{
-    int i = 0;
-
-    while (handles[i] != handle)
-    {
-        if (i > NUM_CARDS * NUM_RESOURCES)
-        {
-            return PCI_BAD_HANDLE;
-        }
-    i++;
-    }
-
-    pointer->adr = address;
-    pointer->len = PCI_MEMORY_SIZE;
-
-    return PCI_SUCCESSFUL;
-}
-
-int32_t pci_virt_to_phys(uint32_t address, PCI_CONV_ADR *pointer)
-{
-    pointer->adr = address;
-    pointer->len = PCI_MEMORY_SIZE;
-
-    return PCI_SUCCESSFUL;
-}
-
-int32_t pci_phys_to_virt(uint32_t address, PCI_CONV_ADR *pointer)
-{
-    pointer->adr = address;
-    pointer->len = PCI_MEMORY_SIZE;
-
-    return PCI_SUCCESSFUL;
-}
-
 /*
  * Not implemented PCI_BIOS functions
  */
@@ -809,6 +736,30 @@ int32_t pci_write_io_longword(int32_t handle, uint32_t offset, uint32_t val)
 }
 
 int32_t pci_get_machine_id(void)
+{
+    return PCI_FUNC_NOT_SUPPORTED;
+}
+
+int32_t pci_get_pagesize(void)
+{
+    return PCI_FUNC_NOT_SUPPORTED;
+}
+
+int32_t pci_virt_to_bus(int32_t handle, uint32_t address, PCI_CONV_ADR *pointer)
+{
+    return PCI_FUNC_NOT_SUPPORTED;
+}
+int32_t pci_bus_to_virt(int32_t handle, uint32_t address, PCI_CONV_ADR *pointer)
+{
+    return PCI_FUNC_NOT_SUPPORTED;
+}
+
+int32_t pci_virt_to_phys(uint32_t address, PCI_CONV_ADR *pointer)
+{
+    return PCI_FUNC_NOT_SUPPORTED;
+}
+
+int32_t pci_phys_to_virt(uint32_t address, PCI_CONV_ADR *pointer)
 {
     return PCI_FUNC_NOT_SUPPORTED;
 }
@@ -996,6 +947,41 @@ static void pci_device_config(uint16_t bus, uint16_t device, uint16_t function)
     if (barnum > 0)
         descriptors[barnum - 1].flags |= FLG_LAST;
 
+    uint8_t reg;
+
+    reg = pci_read_config_byte(handle, PCI_LANESWAP_B(PCICLSR));
+    dbg("Cache Line Size %d\r\n", reg);
+    pci_write_config_byte(handle, PCI_LANESWAP_B(PCICLSR), 8);
+
+    reg = pci_read_config_byte(handle, PCI_LANESWAP_B(PCIMGR));
+    dbg("Min Gnt %d\r\n", reg);
+    if (0/*reg*/) {
+        reg = pci_read_config_byte(handle, PCI_LANESWAP_B(PCIMLR));
+        dbg("Max Lat %d\r\n", reg);
+        if (reg * 8 < 42 * 2) {
+            pci_write_config_byte(handle, PCI_LANESWAP_B(PCILTR), reg * 8);
+
+            reg = pci_read_config_byte(handle, PCI_LANESWAP_B(PCILTR));
+            dbg("Latency %d\r\n", reg);
+        }
+        else {
+            reg = pci_read_config_byte(handle, PCI_LANESWAP_B(PCIMGR));
+            pci_write_config_byte(handle, PCI_LANESWAP_B(PCILTR), reg * 8);
+
+            reg = pci_read_config_byte(handle, PCI_LANESWAP_B(PCILTR));
+            dbg("Latency %d\r\n", reg);
+        }
+    }
+    else {
+        reg = pci_read_config_byte(handle, PCI_LANESWAP_B(PCIMLR));
+        dbg("Max Lat %d\r\n", reg);
+
+        pci_write_config_byte(handle, PCI_LANESWAP_B(PCILTR), 42);
+
+        reg = pci_read_config_byte(handle, PCI_LANESWAP_B(PCILTR));
+        dbg("Latency %d\r\n", reg);
+    }
+
     /* check if device requests an interrupt */
     il = pci_read_config_byte(handle, PCI_LANESWAP_B(PCIIPR));
     dbg("device requests interrupts on interrupt pin %d\r\n", il);
@@ -1007,7 +993,10 @@ static void pci_device_config(uint16_t bus, uint16_t device, uint16_t function)
     /*
      * enable device memory or I/O access
      */
+    cr |= PCICR_SERR | PCICR_PERR | PCICR_MEMWI | PCICR_MASTER;
     pci_write_config_word(handle, PCI_LANESWAP_W(PCICR), swpw(cr));
+
+    pci_write_config_word(handle, PCI_LANESWAP_W(PCISR), swpw(0xFA90));
 }
 
 static void pci_bridge_config(uint16_t bus, uint16_t device, uint16_t function)
@@ -1023,7 +1012,7 @@ static void pci_bridge_config(uint16_t bus, uint16_t device, uint16_t function)
     dbg("handle=%d\r\n", handle);
 
     pci_write_config_longword(handle, PCIBISTR, MCF_PCI_PCICR1_CACHELINESIZE(8) |
-                              MCF_PCI_PCICR1_LATTIMER(0x20));
+                              MCF_PCI_PCICR1_LATTIMER(42));
     pci_write_config_longword(handle, PCIBAR0, swpl(0x80000000));
     pci_write_config_longword(handle, PCIBAR1, 0x0);
     pci_write_config_word(handle, PCI_LANESWAP_W(PCICR), swpw(
@@ -1165,18 +1154,20 @@ void init_pci(void)
      * setup the PCI arbiter
      */
     MCF_PCIARB_PACR = MCF_PCIARB_PACR_INTMPRI   /* internal master priority: high */
-            | MCF_PCIARB_PACR_EXTMPRI(0x0)           /* external master priority: high */
+            | MCF_PCIARB_PACR_EXTMPRI(0x1f)           /* external master priority: high */
             | MCF_PCIARB_PACR_INTMINTEN              /* enable "internal master broken" interrupt */
-            | MCF_PCIARB_PACR_EXTMINTEN(0x0f);       /* enable "external master broken" interrupt */
+            | MCF_PCIARB_PACR_EXTMINTEN(0x1f);       /* enable "external master broken" interrupt */
 
 #if defined(MACHINE_FIREBEE)
-    MCF_PAD_PAR_PCIBG = MCF_PAD_PAR_PCIBG_PAR_PCIBG4_TBST |
-            MCF_PAD_PAR_PCIBG_PAR_PCIBG3_GPIO |
+    MCF_PAD_PAR_PCIBG = 
+//MCF_PAD_PAR_PCIBG_PAR_PCIBG4_TBST |
+//            MCF_PAD_PAR_PCIBG_PAR_PCIBG3_GPIO |
             MCF_PAD_PAR_PCIBG_PAR_PCIBG2_PCIBG2 |
             MCF_PAD_PAR_PCIBG_PAR_PCIBG1_PCIBG1 |
             MCF_PAD_PAR_PCIBG_PAR_PCIBG0_PCIBG0;
-    MCF_PAD_PAR_PCIBR = MCF_PAD_PAR_PCIBR_PAR_PCIBR4_IRQ4 |
-            MCF_PAD_PAR_PCIBR_PAR_PCIBR3_GPIO |
+    MCF_PAD_PAR_PCIBR = 
+// MCF_PAD_PAR_PCIBR_PAR_PCIBR4_IRQ4 |
+//            MCF_PAD_PAR_PCIBR_PAR_PCIBR3_GPIO |
             MCF_PAD_PAR_PCIBR_PAR_PCIBR2_PCIBR2 |
             MCF_PAD_PAR_PCIBR_PAR_PCIBR1_PCIBR1 |
             MCF_PAD_PAR_PCIBR_PAR_PCIBR0_PCIBR0;
@@ -1195,18 +1186,18 @@ void init_pci(void)
 
     MCF_PCI_PCISCR =  MCF_PCI_PCISCR_M |    /* memory access control enabled */
             MCF_PCI_PCISCR_B |                  /* bus master enabled */
-            MCF_PCI_PCISCR_M |                  /* mem access enable */
-            MCF_PCI_PCISCR_MA |                 /* clear master abort error */
-            MCF_PCI_PCISCR_MW |                 /* memory write and invalidate enabled */
-            MCF_PCI_PCISCR_PER;                 /* assert PERR on parity error */
-
+//            MCF_PCI_PCISCR_M |                  /* mem access enable */
+//            MCF_PCI_PCISCR_MA |                 /* clear master abort error */
+            MCF_PCI_PCISCR_MW                  /* memory write and invalidate enabled */
+//            MCF_PCI_PCISCR_PER;                 /* assert PERR on parity error */
+;
 
     /* Setup burst parameters */
     MCF_PCI_PCICR1 = MCF_PCI_PCICR1_CACHELINESIZE(8) |
             MCF_PCI_PCICR1_LATTIMER(0x20); /* TODO: test increased latency timer */
 
     MCF_PCI_PCICR2 = MCF_PCI_PCICR2_MINGNT(1) |
-            MCF_PCI_PCICR2_MAXLAT(32);
+            MCF_PCI_PCICR2_MAXLAT(42);
 
     // MCF_PCI_PCICR2 = 0;      /* this is what Linux does */
 
@@ -1217,8 +1208,8 @@ void init_pci(void)
 
     // MCF_PCI_PCIICR = 0;                      /* this is what Linux does */
 
-    MCF_PCI_PCIGSCR |= MCF_PCI_PCIGSCR_SEE |    /* system error interrupt enable */
-            MCF_PCI_PCIGSCR_PEE;     /* parity error interrupt enable */
+    MCF_PCI_PCIGSCR |= MCF_PCI_PCIGSCR_SEE;     /* system error interrupt enable */
+//            MCF_PCI_PCIGSCR_PEE;     /* parity error interrupt enable */
     /* Configure Initiator Windows */
 
     /*
@@ -1252,9 +1243,9 @@ void init_pci(void)
      * Initialize target control register.
      * Used when an external bus master accesses the Coldfire PCI as target
      */
-    MCF_PCI_PCIBAR0 = 0x40000000;   /* 256 kB window */
+    MCF_PCI_PCIBAR0 = 0x80000000;   /* 256 kB window */
     MCF_PCI_PCITBATR0 = (uint32_t) &_MBAR[0] |  MCF_PCI_PCITBATR0_EN;   /* target base address translation register 0 */
-    MCF_PCI_PCIBAR1 = 0;            /* 1GB window */
+    MCF_PCI_PCIBAR1 = 0x40000000;            /* 1GB window */
     MCF_PCI_PCITBATR1 = MCF_PCI_PCITBATR1_EN;
 
     /* reset PCI devices */
@@ -1268,7 +1259,7 @@ void init_pci(void)
     memset(&resource_descriptors, 0, NUM_CARDS * NUM_RESOURCES * sizeof(struct pci_rd));
 
     /* initialize/clear handles array */
-    memset(handles, 0, NUM_CARDS * sizeof(int32_t));
+    memset(handles, 0, NUM_CARDS * NUM_RESOURCES * sizeof(int32_t));
 
     /* initialize/clear interrupts array */
     memset(interrupts, 0, MAX_INTERRUPTS * sizeof(struct pci_interrupt));

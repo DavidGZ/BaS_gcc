@@ -518,6 +518,17 @@ void mmu_init(void)
             pages[i].execute = 1;
             pages[i].global = 1;
         }
+#if 0
+        else if (addr >= 0x80000000 && addr < 0xe0000000)      /* PCI */
+        {
+            pages[i].cache_mode = CACHE_NOCACHE_PRECISE;
+            pages[i].supervisor_protect = 1;
+            pages[i].read = 1;
+            pages[i].write = 1;
+            pages[i].execute = 0;
+            pages[i].global = 1;
+        }
+#endif
         else
         {
             pages[i].cache_mode = CACHE_COPYBACK;
@@ -620,7 +631,7 @@ void mmu_init(void)
     // pages[0].supervisor_protect = 1;    /* protect system vectors */
 
     /* set data access attributes in ACR0 and ACR1 */
-
+#if 0
     /* map PCI address space */
     /* set SRAM and MBAR access */
     set_acr0(ACR_W(0) |                             /* read and write accesses permitted */
@@ -643,7 +654,7 @@ void mmu_init(void)
 #else
 #error unknown machine!
 #endif /* MACHINE_FIREBEE */
-
+#endif /* 0 */
     /* data access attributes for BaS in flash */
 
     set_acr1(ACR_W(0) |
@@ -710,6 +721,18 @@ void mmu_init(void)
     flags.execute = 0;
     flags.locked = 1;
     mmu_map_page(0x00f00000, 0xfff00000, MMU_PAGE_SIZE_1M, 0, &flags);
+    /*
+     * PCI
+     */
+#if 0
+    flags.cache_mode = CACHE_NOCACHE_PRECISE;
+    flags.supervisor_protect = 1;
+    flags.read = 1;
+    flags.write = 1;
+    flags.execute = 0;
+    flags.locked = 1;
+    mmu_map_page(0x80000000, 0x80000000, MMU_PAGE_SIZE_1M, 0, &flags);
+#endif
 #elif defined(MACHINE_M5484LITE) || defined(MACHINE_M5475EVB)
     /*
      * Map m5484LITE CPLD access

@@ -570,7 +570,7 @@ void BaS(void)
     video_init();
 
     /* initialize USB devices */
-    // init_usb();
+    init_usb();
 
     set_ipl(7);     /* disable interrupts */
 

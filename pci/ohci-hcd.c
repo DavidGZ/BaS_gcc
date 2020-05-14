@@ -102,6 +102,80 @@ static inline void writel(uint32_t value, volatile uint32_t *address)
 
 #define min_t(type, x, y) ({ type __x = (x); type __y = (y); __x < __y ? __x: __y; })
 
+
+void write_registers(volatile ohci_t *ohci)
+{
+    int32_t reg;
+    dbg("--------REGISTERS----------\n\r");
+    readl(&ohci->regs->revision);
+    readl(&ohci->regs->control);
+    readl(&ohci->regs->cmdstatus);
+    readl(&ohci->regs->intrstatus);
+    readl(&ohci->regs->intrenable);
+    readl(&ohci->regs->intrdisable);
+    readl(&ohci->regs->hcca);
+    readl(&ohci->regs->ed_periodcurrent);
+    readl(&ohci->regs->ed_controlhead);
+    readl(&ohci->regs->ed_controlcurrent);
+    readl(&ohci->regs->ed_bulkhead);
+    readl(&ohci->regs->ed_bulkcurrent);
+    readl(&ohci->regs->donehead);
+    readl(&ohci->regs->fminterval);
+    readl(&ohci->regs->fmremaining);
+    readl(&ohci->regs->fmnumber);
+    readl(&ohci->regs->periodicstart);
+    readl(&ohci->regs->lsthresh);
+    readl(&ohci->regs->roothub.a);
+    readl(&ohci->regs->roothub.b);
+    readl(&ohci->regs->roothub.status);
+    readl(&ohci->regs->roothub.portstatus[0]);
+   dbg("--------REGISTERS W----------\n\r");
+    reg = readl(&ohci->regs->revision);
+    writel(reg,&ohci->regs->revision );
+    reg = readl(&ohci->regs->control);
+    writel(reg,&ohci->regs->control );
+    reg = readl(&ohci->regs->cmdstatus);
+    writel(reg, &ohci->regs->cmdstatus);
+    reg = readl(&ohci->regs->intrstatus);
+    writel(reg, &ohci->regs->intrstatus);
+    reg = readl(&ohci->regs->intrenable);
+    writel(reg, &ohci->regs->intrenable);
+    reg = readl(&ohci->regs->intrdisable);
+    writel(reg, &ohci->regs->intrdisable);
+    reg = readl(&ohci->regs->hcca);
+    writel(reg, &ohci->regs->hcca);
+    reg = readl(&ohci->regs->ed_periodcurrent);
+    writel(reg, &ohci->regs->ed_periodcurrent);
+    reg = readl(&ohci->regs->ed_controlhead);
+    writel(reg, &ohci->regs->ed_controlhead);
+    reg = readl(&ohci->regs->ed_controlcurrent);
+    writel(reg, &ohci->regs->ed_controlcurrent);
+    reg = readl(&ohci->regs->ed_bulkhead);
+    writel(reg, &ohci->regs->ed_bulkhead);
+    reg = readl(&ohci->regs->ed_bulkcurrent);
+    writel(reg, &ohci->regs->ed_bulkcurrent);
+    reg = readl(&ohci->regs->donehead);
+    writel(reg, &ohci->regs->donehead);
+    reg = readl(&ohci->regs->fminterval);
+    writel(reg, &ohci->regs->fminterval);
+    reg = readl(&ohci->regs->fmremaining);
+    writel(reg, &ohci->regs->fmremaining);
+    reg = readl(&ohci->regs->fmnumber);
+    writel(reg, &ohci->regs->fmnumber);
+    reg = readl(&ohci->regs->periodicstart);
+    writel(reg, &ohci->regs->periodicstart);
+    reg = readl(&ohci->regs->lsthresh);
+    writel(reg, &ohci->regs->lsthresh);
+    reg = readl(&ohci->regs->roothub.a);
+    writel(reg, &ohci->regs->roothub.a);
+    reg = readl(&ohci->regs->roothub.b);
+    writel(reg, &ohci->regs->roothub.b);
+    reg = readl(&ohci->regs->roothub.status);
+    writel(reg, &ohci->regs->roothub.status);
+    reg = readl(&ohci->regs->roothub.portstatus[0]);
+    writel(reg, &ohci->regs->roothub.portstatus[0]);
+}
+
 struct pci_device_id ohci_usb_pci_table[] =
 {
 {
@@ -1932,6 +2006,8 @@ static int hc_start(volatile ohci_t *ohci)
     unsigned int fminterval;
 
     ohci->disabled = 1;
+
+write_registers(ohci);
 
     /*
      * Tell the controller where the control and bulk lists are
